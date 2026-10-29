@@ -1,0 +1,12 @@
+# Placeholder / example root rate-limiting policy
+# Copy the real content from the original monorepo as needed
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: example-rate-limit
+spec:
+  traffic:
+    rateLimit:
+      local:
+        requests: 100
+        unit: minute
