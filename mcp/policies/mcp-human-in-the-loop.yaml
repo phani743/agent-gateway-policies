@@ -1,0 +1,15 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-human-in-the-loop
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: mcp-backend
+  traffic:
+    authorization:
+      rules:
+        # OPTIONAL: require human_approved claim for high-risk tools
+        - deny: mcp.tool.name in ["transfer_funds", "delete_all_data", "modify_production_config", "revoke_all_tokens"] && !jwt.claims.human_approved

@@ -1,0 +1,15 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-tool-invocation-guard
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: mcp-backend
+  traffic:
+    authorization:
+      rules:
+        # GLOBAL: block dangerous MCP tools
+        - deny: mcp.tool.name in ["delete_resource", "drop_database", "exec_shell", "drop_table", "truncate"]

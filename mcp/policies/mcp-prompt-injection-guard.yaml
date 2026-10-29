@@ -1,0 +1,19 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-prompt-injection-guard
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: mcp-backend
+  traffic:
+    authorization:
+      rules:
+        # OPTIONAL: basic CEL check for common injection patterns in tool params
+        - deny: |
+            has(mcp.tool.params) &&
+            (mcp.tool.params.contains("ignore previous") ||
+             mcp.tool.params.contains("you are now") ||
+             mcp.tool.params.contains("<system>"))
