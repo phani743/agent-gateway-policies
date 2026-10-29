@@ -1,0 +1,28 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: llm-prompt-guard
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm-route
+  backend:
+    ai:
+      promptGuard:
+        request:
+          - openAIModeration:
+              model: omni-moderation-latest
+              policies:
+                auth:
+                  secretRef:
+                    name: openai-api-key
+              rejection:
+                status: 403
+                body: '{"error":"Content blocked by moderation policy"}'
+          - regex:
+              action: Reject
+              builtins:
+                - CreditCard
+                - Ssn

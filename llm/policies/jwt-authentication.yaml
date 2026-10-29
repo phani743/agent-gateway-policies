@@ -1,0 +1,20 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: llm-jwt-authn
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm-route
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: https://your-idp.example.com
+          audiences:
+            - llm-gateway
+          jwks:
+            remote:
+              url: https://your-idp.example.com/.well-known/jwks.json

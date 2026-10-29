@@ -1,0 +1,23 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: openai-backend
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        model: gpt-4o
+    policies:
+      auth:
+        secretRef:
+          name: openai-api-key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openai-api-key
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  Authorization: <your-openai-api-key>
