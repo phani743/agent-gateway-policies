@@ -1,0 +1,12 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: a2a-specialist-backend
+  namespace: agentgateway-system
+spec:
+  static:
+    host: a2a-specialist.default.svc.cluster.local
+    port: 9090
+  policies:
+    tls:
+      mode: SIMPLE

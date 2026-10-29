@@ -1,0 +1,55 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: token-exchange-endpoint
+  namespace: agentgateway-system
+spec:
+  static:
+    host: keycloak.example.com
+    port: 443
+  policies:
+    tls: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oauth-client-secret
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  clientSecret: <your-client-secret>
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: a2a-virtual-token-oss-delegation
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: a2a-specialist-backend
+  backend:
+    auth:
+      oauthTokenExchange:
+        backendRef:
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: token-exchange-endpoint
+        path: /realms/backend/protocol/openid-connect/token
+        grantType: TokenExchange
+        audiences:
+          - a2a-specialist-backend
+        clientAuth:
+          clientId: gateway-client
+          method: ClientSecretBasic
+          secretRef:
+            name: oauth-client-secret
+        subjectToken:
+          tokenType: Jwt
+        actorToken:
+          tokenType: Jwt
+          source:
+            header:
+              name: x-actor-token
+              prefix: "Bearer "

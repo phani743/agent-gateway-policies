@@ -1,0 +1,16 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: a2a-rate-limit
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: a2a-route
+  traffic:
+    rateLimit:
+      local:
+        requestsPerUnit: 60
+        unit: Minute
+        key: 'request.headers["X-Agent-Id"]'

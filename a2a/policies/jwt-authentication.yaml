@@ -1,0 +1,30 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: a2a-jwt-authn
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: a2a-route
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: https://auth.example.com/
+          audiences:
+            - a2a-gateway
+          jwks:
+            remote:
+              url: https://auth.example.com/.well-known/jwks.json
+              refreshInterval: 5m
+          claimsToHeaders:
+            - claim: sub
+              header: X-Agent-Id
+            - claim: scope
+              header: X-Scopes
+      onUnauthenticated:
+        statusCode: 401
+        body:
+          inlineString: '{"error":"authentication required"}'

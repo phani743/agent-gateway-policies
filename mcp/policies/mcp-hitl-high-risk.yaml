@@ -1,0 +1,14 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-hitl-high-risk
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: payments-mcp
+  traffic:
+    authorization:
+      rules:
+        - deny: mcp.tool.name in ["transfer_funds", "delete_account"] && !jwt.claims.human_approved

@@ -1,0 +1,49 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: entra-token-endpoint
+  namespace: agentgateway-system
+spec:
+  static:
+    host: login.microsoftonline.com
+    port: 443
+  policies:
+    tls: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: entra-client-secret
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  clientSecret: <your-entra-client-secret>
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: a2a-entra-obo-virtual-token
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: a2a-specialist-backend
+  backend:
+    auth:
+      oauthTokenExchange:
+        backendRef:
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: entra-token-endpoint
+        path: /<TENANT_ID>/oauth2/v2.0/token
+        grantType: JwtBearer
+        scopes:
+          - https://graph.microsoft.com/.default
+        clientAuth:
+          clientId: <CLIENT_ID>
+          method: ClientSecretPost
+          secretRef:
+            name: entra-client-secret
+        additionalParams:
+          requested_token_use: '"on_behalf_of"'
