@@ -1,0 +1,75 @@
+# MCP Policy Catalog
+# Master index of MCP-specific policies.
+# classification: global (always on) | mandatory (must be explicitly enabled) | optional (on-demand)
+# Each policy maps to a Rego file and declares which gateways it targets.
+
+policies:
+  - name: tool-invocation-guard
+    file: tool-invocation-guard.rego
+    classification: global
+    function: Blocks invocation of dangerous MCP tools (delete, drop, exec, shell) regardless of role or scope
+    gateways: [opa, agent-gateway, k-gateway]
+    edge_case: null
+
+  - name: session-binding
+    file: session-binding.rego
+    classification: global
+    function: Binds every MCP session to the authenticated client identity; rejects session reuse across identities
+    gateways: [opa, agent-gateway, k-gateway]
+    edge_case: null
+
+  - name: protocol-version-pin
+    file: protocol-version-pin.rego
+    classification: global
+    function: Enforces a pinned MCP protocol version range; rejects clients on unsupported versions
+    gateways: [opa, agent-gateway, k-gateway]
+    edge_case: null
+
+  - name: audit-logging
+    file: audit-logging.rego
+    classification: mandatory
+    function: Emits structured audit events for every MCP tool call, decision, and denial
+    gateways: [opa, agent-gateway, k-gateway]
+    edge_case: null
+
+  - name: prompt-injection-detection
+    file: prompt-injection-detection.rego
+    classification: optional
+    function: Scans MCP tool parameters and descriptions for prompt injection patterns
+    gateways: [opa]
+    edge_case: High-risk environments where tool descriptions or parameters come from untrusted sources
+
+  - name: response-sanitization
+    file: response-sanitization.rego
+    classification: optional
+    function: Strips secrets, tokens, and PII from MCP tool responses before they reach the client
+    gateways: [opa, agent-gateway]
+    edge_case: Tools that return database rows or file contents containing sensitive fields
+
+  - name: tool-result-cache-control
+    file: tool-result-cache-control.rego
+    classification: optional
+    function: Controls whether MCP tool results may be cached and for how long
+    gateways: [opa, agent-gateway, k-gateway]
+    edge_case: Tools with time-sensitive or user-specific results that must never be cached
+
+  - name: human-in-the-loop-gate
+    file: human-in-the-loop-gate.rego
+    classification: optional
+    function: Requires explicit human approval before executing high-risk MCP tools
+    gateways: [opa, agent-gateway]
+    edge_case: Financial transactions, destructive operations, or production data mutations
+
+  - name: per-tool-rate-limit
+    file: per-tool-rate-limit.rego
+    classification: optional
+    function: Applies finer-grained rate limits per individual MCP tool rather than per client
+    gateways: [opa, agent-gateway, k-gateway]
+    edge_case: Expensive tools (search, embedding, bulk export) that need tighter caps than the global limit
+
+  - name: data-exfiltration-guard
+    file: data-exfiltration-guard.rego
+    classification: optional
+    function: Detects and blocks bulk data reads that exceed configured thresholds
+    gateways: [opa]
+    edge_case: Read-heavy tools that could leak entire datasets in a single call
