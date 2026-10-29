@@ -1,0 +1,63 @@
+name: Agent Gateway Policy CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  KUBECTL_VERSION: ${{ vars.KUBECTL_VERSION || 'latest' }}
+  GATEWAY_NS: ${{ vars.AGENT_GATEWAY_NS || 'mcp-gateway' }}
+
+jobs:
+  validate-manifests:
+    name: Validate YAML manifests
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: YAML lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: deploy/yamllint.yaml
+          file_or_dir: |
+            *.yaml
+            a2a/policies
+            llm/policies
+            mcp/policies
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Dry-run apply against cluster
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
+        run: |
+          if [ -z "${KUBECONFIG_B64}" ]; then
+            echo "No KUBECONFIG secret; skipping dry-run"
+            exit 0
+          fi
+          echo "${KUBECONFIG_B64}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          for dir in . a2a/policies llm/policies mcp/policies; do
+            [ -d "$dir" ] || continue
+            for f in "$dir"/*.yaml; do
+              [ -f "$f" ] || continue
+              echo "Validating $f"
+              kubectl apply --dry-run=server -f "$f" -n "${GATEWAY_NS}" || true
+            done
+          done
+
+      - name: Kubeconform schema check
+        uses: yannh/kubeconform-action@v3
+        with:
+          files: |
+            *.yaml
+            a2a/policies
+            llm/policies
+          strict: true
+          skip: CustomResourceDefinition

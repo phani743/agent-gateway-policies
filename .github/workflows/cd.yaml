@@ -1,0 +1,128 @@
+name: Agent Gateway Policy CD (AKS)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_namespace:
+        description: 'Override target namespace'
+        required: false
+        type: string
+
+env:
+  AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
+  AKS_CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
+  GATEWAY_NS: ${{ vars.AGENT_GATEWAY_NS || inputs.target_namespace || 'mcp-gateway' }}
+  DEPLOY_NAME: ${{ vars.AGENT_GATEWAY_DEPLOY || 'agent-gateway' }}
+  KUBECTL_VERSION: ${{ vars.KUBECTL_VERSION || 'latest' }}
+  ENABLED_POLICIES: ${{ vars.ENABLED_POLICIES }}
+
+jobs:
+  deploy:
+    name: Apply policies to AKS Agent Gateway
+    runs-on: ${{ vars.CD_RUNNER || 'ubuntu-latest' }}
+    environment: ${{ vars.DEPLOY_ENVIRONMENT || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (optional, if using SP / OIDC)
+        if: ${{ vars.USE_AZURE_LOGIN == 'true' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        if: ${{ vars.USE_AZURE_LOGIN == 'true' }}
+        run: |
+          az aks get-credentials --resource-group "${AKS_RESOURCE_GROUP}" --name "${AKS_CLUSTER_NAME}" --overwrite-existing
+          kubectl config use-context "${AKS_CLUSTER_NAME}"
+
+      - name: Configure cluster from KUBECONFIG secret (fallback / preferred)
+        if: ${{ vars.USE_AZURE_LOGIN != 'true' }}
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
+        run: |
+          echo "${KUBECONFIG_B64}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          kubectl cluster-info
+          echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Ensure namespace exists
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          kubectl create namespace "${GATEWAY_NS}" --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply root policies
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          for f in *.yaml; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f" .yaml)
+            if [ -z "${ENABLED_POLICIES}" ] || echo ",${ENABLED_POLICIES}," | grep -q ",$base,"; then
+              echo "Applying $f"
+              kubectl apply -f "$f" -n "${GATEWAY_NS}"
+            fi
+          done
+
+      - name: Apply A2A policies
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          for f in a2a/policies/*.yaml; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f" .yaml)
+            if [ -z "${ENABLED_POLICIES}" ] || echo ",${ENABLED_POLICIES}," | grep -q ",$base,"; then
+              echo "Applying $f"
+              kubectl apply -f "$f" -n "${GATEWAY_NS}"
+            fi
+          done
+
+      - name: Apply LLM policies
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          for f in llm/policies/*.yaml; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f" .yaml)
+            if [ -z "${ENABLED_POLICIES}" ] || echo ",${ENABLED_POLICIES}," | grep -q ",$base,"; then
+              echo "Applying $f"
+              kubectl apply -f "$f" -n "${GATEWAY_NS}"
+            fi
+          done
+
+      - name: Apply MCP policies (if any)
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          if [ -d mcp/policies ]; then
+            for f in mcp/policies/*.yaml; do
+              [ -f "$f" ] || continue
+              base=$(basename "$f" .yaml)
+              if [ -z "${ENABLED_POLICIES}" ] || echo ",${ENABLED_POLICIES}," | grep -q ",$base,"; then
+                echo "Applying $f"
+                kubectl apply -f "$f" -n "${GATEWAY_NS}"
+              fi
+            done
+          fi
+
+      - name: Wait for gateway rollout
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          kubectl rollout status deployment/"${DEPLOY_NAME}" \
+            -n "${GATEWAY_NS}" --timeout=300s || echo "No deployment found or already ready"
+
+      - name: Post-deploy smoke test
+        run: |
+          export KUBECONFIG=${{ env.KUBECONFIG || 'kubeconfig' }}
+          kubectl port-forward -n "${GATEWAY_NS}" deploy/"${DEPLOY_NAME}" 18080:8080 &
+          sleep 10
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/readyz || echo "000")
+          if [ "$code" != "200" ]; then
+            echo "::warning::Gateway not ready or /readyz unavailable (status $code). Check pod logs."
+          else
+            echo "Deploy verified: gateway healthy"
+          fi
