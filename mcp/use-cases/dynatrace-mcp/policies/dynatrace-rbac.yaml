@@ -1,0 +1,21 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: dynatrace-rbac
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: dynatrace-mcp
+  traffic:
+    authorization:
+      rules:
+        # observer role — read-only tools
+        - allow: jwt.claims.roles.contains("observer") && mcp.tool.name in ["get_problems", "get_metrics", "get_logs", "get_traces"]
+        # sre role — read + limited write
+        - allow: jwt.claims.roles.contains("sre") && mcp.tool.name in ["get_problems", "get_metrics", "get_logs", "create_alert", "update_maintenance_window"]
+        # admin role — all tools (HITL still applies separately)
+        - allow: jwt.claims.roles.contains("admin")
+        # default deny
+        - deny: true

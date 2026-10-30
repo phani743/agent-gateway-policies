@@ -1,0 +1,25 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: dynatrace-jwt-auth
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mcp-route
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: https://login.microsoftonline.com/<TENANT_ID>/v2.0
+          audiences:
+            - api://dynatrace-mcp
+          jwks:
+            remote:
+              url: https://login.microsoftonline.com/<TENANT_ID>/discovery/v2.0/keys
+          claimsToHeaders:
+            - claim: roles
+              header: X-Roles
+            - claim: sub
+              header: X-User-Id

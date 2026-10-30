@@ -1,0 +1,26 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: dynatrace-mcp
+  namespace: agentgateway-system
+spec:
+  static:
+    host: dynatrace-mcp.default.svc.cluster.local
+    port: 8080
+  policies:
+    tls:
+      mode: SIMPLE
+    auth:
+      # Dynatrace API token — never exposed to agents
+      static:
+        secretRef:
+          name: dynatrace-api-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dynatrace-api-token
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  Authorization: Api-Token <your-dynatrace-api-token>

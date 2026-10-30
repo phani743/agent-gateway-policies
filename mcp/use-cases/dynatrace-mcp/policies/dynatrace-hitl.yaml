@@ -1,0 +1,15 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: dynatrace-hitl
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      name: dynatrace-mcp
+  traffic:
+    authorization:
+      rules:
+        # High-risk tools require human_approved claim
+        - deny: mcp.tool.name in ["delete_alert", "disable_monitoring", "update_configuration"] && !jwt.claims.human_approved
